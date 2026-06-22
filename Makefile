@@ -1,0 +1,50 @@
+export SHELL=/bin/bash
+
+.DEFAULT_GOAL := sim
+
+TOP := hello_world_tb
+
+ROOT_DIR  := $(CURDIR)
+BUILD_DIR := $(ROOT_DIR)/build
+LOG_DIR   := $(ROOT_DIR)/log
+
+FILES += -i $(ROOT_DIR)/include
+FILES += -i $(ROOT_DIR)/submodule/axi/include
+FILES += $(ROOT_DIR)/submodule/axi/src/axi_pkg.sv
+# FILES += $(shell find $(ROOT_DIR)/interface -name "*.sv")
+FILES += $(shell find $(ROOT_DIR)/src -name "*.sv")
+# FILES += $(shell find $(ROOT_DIR)/tb -name "*.sv")
+
+EWLH := | grep -iE "error:|warning:|" --color=auto
+
+
+.PHONY: print
+print:
+	@echo "$(FILES)"
+
+.PHONY: clean
+clean:
+	@rm -rf $(BUILD_DIR)
+	@echo -e "\033[1;33mCleaned build directory:\033[0m $(BUILD_DIR)"
+
+.PHONY: clean_full
+clean_full:
+	@make -s clean
+	@rm -rf $(LOG_DIR)
+	@echo -e "\033[1;33mCleaned log directory:\033[0m $(LOG_DIR)"
+
+$(BUILD_DIR) $(LOG_DIR):
+	@mkdir -p $@
+	@echo "*" > $@/.gitignore
+	@echo -e "\033[1;33mCreated directory:\033[0m $@"
+
+.PHONY: sim
+sim:
+	@git submodule update --init --depth 1
+	@make -s clean
+	@make -s $(BUILD_DIR)
+	@make -s $(LOG_DIR)
+	@echo -e "\033[1;33mStarting simulation for top-level module:\033[0m $(TOP)"
+	@cd $(BUILD_DIR) && xvlog -sv $(FILES) -log $(LOG_DIR)/xvlog_$(shell date +%Y%m%d_%H%M%S).log $(EWLH)
+	@cd $(BUILD_DIR) && xelab $(TOP) -debug all -s snap_$(TOP) -log $(LOG_DIR)/xelab_$(TOP)_$(shell date +%Y%m%d_%H%M%S).log $(EWLH)
+	@cd $(BUILD_DIR) && xsim snap_$(TOP) -runall -log $(LOG_DIR)/xsim_$(TOP)_$(shell date +%Y%m%d_%H%M%S).log $(EWLH)
